@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # coding=utf-8
+import os
 import sys
 import json
 import urllib.request
-from utils import Fore, parse_image_arg, chunked_copy
+from utils import Fore, parse_image_arg, chunked_copy, clear_progress, handle_sigint, ensure_ca_load
 
 # handle arguments
 
+handle_sigint()
+ensure_ca_load()
+
 if len(sys.argv) < 2:
 	print('usage: ./get-prebuilt.py image[:tag]')
-	exit(-1)
+	sys.exit(-1)
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
@@ -28,11 +32,11 @@ try:
 
 except urllib.error.HTTPError as err:
 	print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 except KeyError as err:
 	print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 # get the image manifest
 
@@ -50,16 +54,20 @@ try:
 
 		if len(manifest['fsLayers']) == 0:
 			print('%s[!]%s Manifest for image %s%s%s has no layers.' % (Fore.RED, Fore.RESET, Fore.BLUE, image, Fore.RESET))
-			exit(-1)
+			sys.exit(-1)
 
 except urllib.error.HTTPError as err:
 	print('%s[!]%s Failed to fetch manifest info for %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, image, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 # download the layers
 
 dled   = set()
 fname += '.tar.gz'
+
+# remove old file before download
+if os.path.exists(fname):
+	os.remove(fname)
 
 for layer in manifest['fsLayers']:
 	if layer['blobSum'] in dled:
@@ -77,11 +85,13 @@ for layer in manifest['fsLayers']:
 			chunked_copy(fname, u, f)
 
 	except urllib.error.HTTPError as err:
+		clear_progress()
 		print('%s[!]%s Failed to download layer %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, layer['blobSum'], Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 	except OSError as err:
+		clear_progress()
 		print('%s[!]%s Failed to open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 print('%s[*]%s Rootfs archive for %s%s%s:%s%s%s saved to %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET, Fore.GREEN, fname, Fore.RESET))

@@ -2,13 +2,16 @@
 # coding=utf-8
 import sys
 import urllib.request
-from utils import Fore, parse_image_arg, chunked_copy
+from utils import Fore, parse_image_arg, chunked_copy, clear_progress, handle_sigint, ensure_ca_load
 
 # handle arguments
 
+handle_sigint()
+ensure_ca_load()
+
 if len(sys.argv) < 2:
 	print('usage: ./get-source.py image[:tag]')
-	exit(-1)
+	sys.exit(-1)
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
@@ -104,12 +107,12 @@ try:
 
 		if not dfurl:
 			print('%s[!]%s Failed to find tag %s%s%s for image %s%s%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, tag, Fore.RESET, Fore.BLUE, image, Fore.RESET))
-			exit(-1)
+			sys.exit(-1)
 
 except urllib.error.HTTPError as err:
 	print('%s[!]%s Failed to fetch official-images info for %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, image, Fore.RESET, err))
 	print('%s[!]%s If this is not an official image, try getting it with %sget-prebuilt.py %s%s.' % (Fore.RED, Fore.RESET, Fore.GREEN, sys.argv[1].strip(), Fore.RESET))
-	exit(-1)
+	sys.exit(-1)
 
 # process Dockerfile
 
@@ -134,11 +137,11 @@ try:
 
 		if not tgurl:
 			print('%s[!]%s Failed to find a suitable rootfs specification in Dockerfile.' % (Fore.RED, Fore.RESET))
-			exit(-1)
+			sys.exit(-1)
 
 except urllib.error.HTTPError as err:
 	print('%s[!]%s Failed to fetch Dockerfile from %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, dfurl, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 # download rootfs archive
 
@@ -149,11 +152,13 @@ try:
 		chunked_copy(fname, u, f)
 
 except urllib.error.HTTPError as err:
+	clear_progress()
 	print('%s[!]%s Failed to download archive from %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, tgurl, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 except OSError as err:
+	clear_progress()
 	print('%s[!]%s Failed to open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 print('%s[*]%s Rootfs archive for %s%s%s:%s%s%s saved to %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET, Fore.GREEN, fname, Fore.RESET))
